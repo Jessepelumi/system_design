@@ -18,7 +18,7 @@ Fanout Workers pick up the message from the queue and consult our Redis Session 
 Because our Terminal Users maintain long-lived, active connections with these stateful WebSocket nodes, the nodes instantly push the alert down the open socket in sub-100ms. If a user has just logged on or reconnected after being offline, the WebSocket server will proactively query our News Feed Cache (a Redis Sorted Set) to catch them up on historical headlines before merging them into the active live stream.
 
 
-![Global News Alert And Delivery System](GlobalNewsAlert.png)
+![Global News Alert And Delivery System](GlobalNewsAlertAndDeliverySystem.png)
 
 
 ### Engineering Details
