@@ -1,11 +1,51 @@
 ## Global News Alert And Delivery System
 
+### Requirements Gathering
+
+1. **News Ordering:**
+
+
+I assume we require strict reverse chronological order for standard feeds so traders see the newest market information first. However, do we have an Urgency/Flash Tier that needs to override the standard order and pin critical updates to the top of the terminal screen?
+
+2. **Media:**
+
+
+Are alerts strictly text headlines, or do they support rich media like charts, images, and video clips? If media is supported, I'll separate the heavy binary payloads from our real-time messaging data path to prevent network blocking and avoid impacting low-latency headline delivery.
+
+3. **Traffic Volume (Scale):**
+
+
+What is our scale or traffic volume? I'm assuming write traffic from journalists is relatively low (e.g., 10-50 stories per second), but our fan-out delivery traffic is massive and spiky—potentially faning out to millions of concurrent terminal connections worldwide during market opens.
+
+4. **Important Features:**
+
+
+Beyond simple headline distribution, are we responsible for user-defined keyword filtering (e.g., users subscribing to specific stock tickers), and do we need to support out-of-band delivery channels like SMS or email alerts alongside the terminal sockets?
+
+5. **Latency Targets:**
+
+
+What is our end-to-end latency budget? I am targeting a strict sub-100ms delivery window from the moment a journalist hits 'Publish' to the millisecond it renders on global client terminals. Is that constraint accurate?
+
 ### Phase 1: Ingestion & Buffering
 
 When content originates from Bloomberg journalists or external wire feeds, it hits our Ingestion tier via a Load Balancer and stateless Web Servers. The Ingestion Service instantly verifies news item uniqueness via a cryptographic token (Idempotency Hash) lookup against a Redis Cache to guarantee message deduplication at the gateway. If unique, it drops the raw payload into our first Distributed Message Queue (Kafka) and returns a 202 acknowledgment.
 
 
+**Note:** An idempotency hash is a value used to ensure that the same request processed multiple times produces only one final effect.
+
+```JSON
+{
+  "headline": "Fed raises interest rates",
+  "idempotency_key": "abc123"
+}
+```
+
+
 Asynchronously, dedicated consumer workers pull from this Kafka topic: the Storage Processing Service commits metadata to our NoSQL Database, and the Media Processing Service extracts binary assets to dump into AWS S3 where they are cached globally at edge locations by a CDN.
+
+
+**Note:** We use a NoSQL database because our workload is heavily write-optimized and horizontally scalable. The system primarily performs simple access patterns like fetching recent news by topic, ticker, or timestamp rather than complex relational joins or transactional queries. Since we don't require strong relational consistency or complex multi-table operations, a distributed NoSQL store is a better fit for high-throughput ingestion and global-scale fan-out. We trade away complex joins and some transactional flexibility in exchange for horizontal scalability, partition tolerance, and predictable high-volume writes.
 
 ### Phase 2: Regional Isolation & Delivery
 
